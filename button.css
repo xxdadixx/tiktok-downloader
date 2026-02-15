@@ -1,30 +1,39 @@
-/* เปลี่ยนจาก #tiktok-save-button เป็น .tiktok-save-button */
+/* button.css */
 .tiktok-save-button {
   position: absolute;
-  right: 15px;
-  top: 50%;
-  transform: translateY(-50%);
+  /* ย้ายไปมุมขวาบน (Top-Right) เพื่อหลบ UI ของ TikTok ส่วนใหญ่ */
+  top: 10px;
+  right: 10px;
   
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   
-  background-color: #ff0050;
+  /* ใช้สีดำโปร่งแสง เพื่อไม่ให้รบกวนสายตาเวลาดูคลิป */
+  background-color: rgba(22, 24, 35, 0.6);
   color: white;
-  font-size: 20px;
-  font-weight: bold;
   
   display: flex;
   align-items: center;
   justify-content: center;
   
   cursor: pointer;
-  z-index: 2147483647 !important;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  z-index: 100; /* ลด z-index ลงเพื่อให้ Modal อื่นๆ ทับได้ถ้าจำเป็น */
+  
+  transition: all 0.2s ease;
   user-select: none;
+  
+  /* --- สำคัญมาก --- */
+  /* ให้ตัวปุ่มรับ Event ได้ แต่ส่วนที่เป็น SVG ข้างในไม่ขวาง */
+  pointer-events: auto; 
 }
 
 .tiktok-save-button:hover {
-  background-color: #e60046;
-  transform: translateY(-50%) scale(1.1);
+  background-color: #fe2c55; /* เปลี่ยนเป็นสีแดง TikTok เมื่อเอาเมาส์ชี้ */
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.tiktok-save-button svg {
+  pointer-events: none; /* คลิกที่ไอคอนก็ถือว่าคลิกที่ปุ่ม */
 }
