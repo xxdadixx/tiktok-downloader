@@ -1,37 +1,51 @@
 (function () {
 
+    function getVideoMetadata(videoElement) {
+        const videoURL = findVideoUrl(videoElement);
+        if (!videoURL) return { url: null };
+
+        // 1. ดึง Video ID จาก URL (ตัวเลขหลัง /video/)
+        const videoIdMatch = videoURL.match(/\/video\/(\d+)/);
+        const videoId = videoIdMatch ? videoIdMatch[1] : "unknown";
+
+        // 2. ดึง Username
+        let username = "user";
+
+        // ลองหาจาก DOM Selector ของ TikTok
+        const userElement = document.querySelector('[data-e2e="browse-user-proxy"], [data-e2e="video-author-uniqueid"], [data-e2e="user-title"]');
+
+        if (userElement && userElement.textContent) {
+            username = userElement.textContent.trim().replace('@', '');
+        } else {
+            // ถ้าหาใน DOM ไม่เจอ ให้ลองดึงจาก URL (รูปแบบ tiktok.com/@username)
+            const urlMatch = window.location.href.match(/@([a-zA-Z0-9._-]+)/);
+            if (urlMatch) {
+                username = urlMatch[1];
+            }
+        }
+
+        return {
+            url: videoURL,
+            videoId: videoId,
+            username: username
+        };
+    }
     /**
-     * ฟังก์ชันค้นหา URL ของวิดีโอที่ปรับปรุงใหม่ (Robust Version)
-     * รองรับทั้งหน้า Feed (Scroll), Profile (Grid), และ Modal (Full screen)
+     * ฟังก์ชันค้นหา URL ของวิดีโอ (ใช้ Logic เดิมที่แม่นยำแล้ว)
      */
     function findVideoUrl(videoElement) {
-        
-        // 1. เช็ค URL บน Address Bar ก่อน (กรณีเปิดหน้าดูคลิปเดี่ยวๆ หรือ Modal)
+        // 1. เช็ค URL บน Address Bar (กรณีเปิดหน้าคลิปเดี่ยว/Modal)
         if (/\/video\/\d+/.test(window.location.href)) {
             return window.location.href;
         }
 
-        // 2. กรณีหน้า Profile (Grid View):
-        // วิดีโอมักจะถูกหุ้มด้วย <a> หรือมี <a> เป็น Parent ใกล้ๆ
+        // 2. เช็คกรณีหน้า Profile/Modal
         const closestLink = videoElement.closest('a');
         if (closestLink && /\/video\/\d+/.test(closestLink.href)) {
             return closestLink.href;
         }
 
-        // 3. กรณีหน้า Feed (จุดสำคัญที่แก้ Bug Link not found):
-        // แทนที่จะสุ่มหา Parent เราจะหา "กล่องโพสต์หลัก" ด้วย data-e2e
-        const postContainer = videoElement.closest('[data-e2e="recommend-list-item-container"], [data-e2e="list-item-container"]');
-        
-        if (postContainer) {
-            // ค้นหาลิงก์ทั้งหมดในกล่องโพสต์นี้
-            const allLinks = Array.from(postContainer.querySelectorAll('a'));
-            // กรองหาลิงก์ที่มีแพทเทิร์น /video/ ตามด้วยตัวเลข (ID)
-            const videoLink = allLinks.find(link => link.href && /\/video\/\d+/.test(link.href));
-            
-            if (videoLink) return videoLink.href;
-        }
-
-        // 4. (Fallback) กรณีหาไม่เจอจริงๆ ให้ลองดู Canonical URL
+        // 3. Fallback: Canonical URL
         const canonical = document.querySelector('link[rel="canonical"]');
         if (canonical && /\/video\/\d+/.test(canonical.href)) {
             return canonical.href;
@@ -44,63 +58,66 @@
      * ฟังก์ชันสร้างปุ่ม Download
      */
     function processVideo(video) {
-        // หา Parent โดยตรงของ Video (ปลอดภัยที่สุด ไม่กระทบ Layout อื่น)
+
+        // --- 🛑 FEED FILTER ---
+        // ป้องกันไม่ให้ปุ่มไปโผล่ในหน้า Feed รวม (For You) เพราะอาจเกะกะ
+        // ให้โผล่เฉพาะตอนกดเข้ามาดูคลิป (Modal/Detail) ตามโจทย์ "เมื่อกดเข้าไปดู"
+        const isFeedVideo = video.closest('[data-e2e="recommend-list-item-container"], [data-e2e="list-item-container"]');
+        if (isFeedVideo) return;
+
+        // หา Container: ใช้ Parent โดยตรงเพื่อความปลอดภัย
         let container = video.parentElement;
-        
-        // ถ้า Parent เป็น <a> อยู่แล้ว ให้ใช้ตัวมันเองเป็น Container
+
+        // ถ้า Parent เป็น <a> ใช้ตัวมันเองเลย
         if (container.tagName === 'A') {
-            // กรณีนี้ปลอดภัย
+            // OK
         } else {
-            // เช็คเพิ่มเติมนิดหน่อย: ถ้า Container เล็กผิดปกติ (เช่นเป็นแค่ layer ควบคุม) ให้ขยับขึ้น 1 ชั้น
+            // ถ้า Container เล็กไป (เช่นเป็น Layer ควบคุม) ขยับขึ้น 1 ชั้น
             if (container.clientWidth < video.clientWidth * 0.9) {
                 if (container.parentElement) container = container.parentElement;
             }
         }
 
-        // ป้องกันการสร้างปุ่มซ้ำ
+        // ป้องกันสร้างซ้ำ
         if (container.querySelector(".tiktok-save-button")) return;
 
-        // --- แก้ไขจุดที่ทำให้หน้า Feed จอดำ ---
-        // เราจะไม่บังคับเปลี่ยน position ของ container สุ่มสี่สุ่มห้า
-        // แต่เราจะตรวจสอบก่อน ถ้าเป็น static เราถึงจะเปลี่ยนเป็น relative 
-        // เฉพาะเมื่อ container นั้นขนาดเท่ากับ video จริงๆ (เพื่อไม่ให้กระทบ Grid หรือ Layout ใหญ่)
-        const style = window.getComputedStyle(container);
-        if (style.position === 'static') {
-            container.style.position = 'relative';
-        }
+        // ⚠️ CRITICAL FIX (แก้ปัญหาภาพค้าง):
+        // ลบส่วนที่สั่ง container.style.position = 'relative' ออกไป!
+        // การไม่ไปยุ่งกับ style ของ container เดิม จะทำให้ video player ทำงานได้ปกติ 100%
+        // (ปกติ wrapper ของ video จะเป็น positioned element อยู่แล้ว ปุ่มเราจะเกาะได้เอง)
 
         // สร้างปุ่ม
         const btn = document.createElement("div");
         btn.className = "tiktok-save-button";
-        // ใช้ SVG Icon เพื่อความสวยงามและชัดเจน
-        btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
+        // ไอคอนลูกศร
+        btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
 
-        // Event เมื่อคลิกปุ่ม
+        // Event Click
         btn.onclick = function (e) {
-            e.preventDefault(); // ป้องกันลิงก์ทำงาน (ถ้าอยู่ใน <a>)
-            e.stopPropagation(); // ***สำคัญมาก*** หยุด Event ไม่ให้ทะลุไปกด Pause/Play วิดีโอ
+            e.preventDefault();
+            e.stopPropagation(); // ห้ามทะลุไป Pause วิดีโอ
 
-            const videoURL = findVideoUrl(video); 
+            const metadata = getVideoMetadata(video); 
+            console.log("[TikTok Downloader] Detected URL:", metadata);
 
-            console.log("[TikTok Downloader] Detected URL:", videoURL);
-
-            if (videoURL) {
-                const target = "https://savetik.co/?video=" + encodeURIComponent(videoURL);
+            if (metadata.url) {
+                const target = "https://savetik.co/?video=" + encodeURIComponent(metadata.url);
                 chrome.runtime.sendMessage({
                     action: "openSaveTik",
-                    url: target
+                    url: target, // นี่คือ URL ของ Savetik
+                    originalVideoUrl: metadata.url, // ส่ง URL วิดีโอต้นฉบับไปเป็น Key
+                    username: metadata.username,
+                    videoId: metadata.videoId
                 });
             } else {
-                alert("Error: Link not found. Please try opening the video in full screen mode.");
+                alert("Could not find video link. Please try opening the video in full screen.");
             }
         };
 
         container.appendChild(btn);
     }
 
-    /**
-     * Observer คอยจับตาดู DOM เมื่อมีการเลื่อน Feed หรือโหลดคลิปใหม่
-     */
+    // Observer
     function handleMutations() {
         const videos = document.querySelectorAll("video");
         videos.forEach(video => {
@@ -113,8 +130,8 @@
     });
 
     observer.observe(document.body, { childList: true, subtree: true });
-    
-    // รันครั้งแรกทันทีเผื่อมีวิดีโออยู่แล้ว
     handleMutations();
+
+
 
 })();

@@ -1,39 +1,44 @@
 /* button.css */
 .tiktok-save-button {
   position: absolute;
-  /* ย้ายไปมุมขวาบน (Top-Right) เพื่อหลบ UI ของ TikTok ส่วนใหญ่ */
-  top: 10px;
-  right: 10px;
   
-  width: 36px;
-  height: 36px;
+  /* --- จัดตำแหน่ง: ด้านขวา กึ่งกลาง (Middle Right) --- */
+  top: 50%;
+  right: 15px; /* ขยับออกมานิดนึงไม่ให้ชิดขอบจอเกินไป */
+  transform: translateY(-50%); /* ดึงกลับขึ้นมา 50% ของขนาดตัวเองเพื่อให้กลางเป๊ะ */
+  
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   
-  /* ใช้สีดำโปร่งแสง เพื่อไม่ให้รบกวนสายตาเวลาดูคลิป */
-  background-color: rgba(22, 24, 35, 0.6);
+  /* สีดำโปร่งแสง (Glassmorphism) ดูทันสมัยและไม่รบกวนสายตา */
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   
   display: flex;
   align-items: center;
   justify-content: center;
   
   cursor: pointer;
-  z-index: 100; /* ลด z-index ลงเพื่อให้ Modal อื่นๆ ทับได้ถ้าจำเป็น */
+  z-index: 999; /* ให้ลอยอยู่เหนือ Video */
   
   transition: all 0.2s ease;
   user-select: none;
   
-  /* --- สำคัญมาก --- */
-  /* ให้ตัวปุ่มรับ Event ได้ แต่ส่วนที่เป็น SVG ข้างในไม่ขวาง */
+  /* ให้ปุ่มกดได้ แต่ไม่บังพื้นที่รอบๆ */
   pointer-events: auto; 
 }
 
+/* Hover Effect */
 .tiktok-save-button:hover {
-  background-color: #fe2c55; /* เปลี่ยนเป็นสีแดง TikTok เมื่อเอาเมาส์ชี้ */
-  transform: scale(1.1);
+  background-color: #fe2c55; /* สีแดง TikTok */
+  transform: translateY(-50%) scale(1.1); /* ขยายเล็กน้อยแต่ยังรักษากึ่งกลางไว้ */
+  border-color: transparent;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .tiktok-save-button svg {
-  pointer-events: none; /* คลิกที่ไอคอนก็ถือว่าคลิกที่ปุ่ม */
+  pointer-events: none;
 }

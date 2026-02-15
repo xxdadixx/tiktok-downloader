@@ -1,34 +1,46 @@
-console.log("[BG] background.js loaded.");
+// เก็บข้อมูลชั่วคราวระหว่างรอเปลี่ยนหน้าไปยัง SaveTik
+let downloadQueue = {};
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
 
-    // 1) เปิดหน้า SaveTik
+    // 1) รับคำสั่งเปิด SaveTik และเก็บ Metadata ไว้
     if (msg.action === "openSaveTik") {
+        // บันทึกข้อมูลโดยใช้ URL เป็น key
+        downloadQueue[msg.url] = {
+            username: msg.username || "user",
+            videoId: msg.videoId || "video"
+        };
         chrome.tabs.create({ url: msg.url, active: false });
         return; 
     }
 
-    // 2) สั่งดาวน์โหลด
+    // 2) สั่งดาวน์โหลดจริง (เมื่อ Savetik ทำงานเสร็จ)
     if (msg.action === "forceDownload") {
-        console.log("[BG] Downloading:", msg.url);
+        // ค้นหา metadata จากข้อมูลที่ส่งมาจาก Savetik หรือจากคิวที่เก็บไว้
+        const originalUrl = sender.tab.url; // URL ของหน้า Savetik ที่มี ?video=...
+        const params = new URLSearchParams(new URL(originalUrl).search);
+        const videoKey = originalUrl;
+        
+        const metadata = downloadQueue[videoKey] || { username: "tiktok", videoId: "video" };
 
-        // ตั้งชื่อไฟล์เอง กันไม่ให้ได้ไฟล์ชื่อ 'get'
         const timestamp = new Date().getTime();
-        const filename = `tiktok_${timestamp}.mp4`;
+        // สร้างเลขสุ่ม 6 หลัก
+        const random6 = Math.floor(100000 + Math.random() * 900000);
+        
+        // รูปแบบ: Username หรือ ID_timestamp_เลขสุ่ม6หลัก.mp4
+        const userIdentifier = metadata.username !== "user" ? metadata.username : metadata.videoId;
+        const filename = `${userIdentifier}_${timestamp}_${random6}.mp4`;
 
-        // ใช้ API Downloads
         chrome.downloads.download({ 
             url: msg.url,
-            filename: filename, // บังคับชื่อไฟล์
+            filename: filename,
             conflictAction: "uniquify"
-        }, (downloadId) => {
-             // เช็ค Error เผื่อลิงก์เสีย
-             if (chrome.runtime.lastError) {
-                 console.error("Download failed:", chrome.runtime.lastError);
-             }
+        }, () => {
+             if (chrome.runtime.lastError) console.error(chrome.runtime.lastError);
+             // ล้างข้อมูลในคิวออก
+             delete downloadQueue[videoKey];
         });
 
-        // ปิดแท็บ SaveTik ที่ทำงานเสร็จแล้ว
         if (sender.tab && sender.tab.id) {
             chrome.tabs.remove(sender.tab.id);
         }
