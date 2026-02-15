@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "TikTok Auto Saver Button",
+  "version": "1.0",
+  "permissions": ["tabs", "activeTab"],
+  "host_permissions": [
+    "*://savetik.co/*",
+    "*://dl.snapcdn.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.tiktok.com/*", "*://tiktok.com/*"],
+      "js": ["content.js"],
+      "css": ["button.css"]
+    },
+    {
+      "matches": ["*://savetik.co/*"],
+      "js": [
+        "savetik-detector.js",
+        "savetik-fill.js",
+        "savetik-auto-download.js"
+      ]
+    }
+  ]
+}

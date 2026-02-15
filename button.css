@@ -1,0 +1,22 @@
+#tiktok-save-button {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: #ff0050;
+  color: white;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  z-index: 9999999;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+
+#tiktok-save-button:hover {
+  background-color: #e60046;
+}
