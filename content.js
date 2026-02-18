@@ -67,6 +67,7 @@
 
         // หา Container: ใช้ Parent โดยตรงเพื่อความปลอดภัย
         let container = video.parentElement;
+        if (container.querySelector(".tiktok-save-button")) return;
 
         // ถ้า Parent เป็น <a> ใช้ตัวมันเองเลย
         if (container.tagName === 'A') {
@@ -97,8 +98,8 @@
             e.preventDefault();
             e.stopPropagation(); // ห้ามทะลุไป Pause วิดีโอ
 
-            const metadata = getVideoMetadata(video); 
-            console.log("[TikTok Downloader] Detected URL:", metadata);
+            const metadata = getVideoMetadata(video);
+            console.log("[TikTok Downloader] Extracting Metadata:", metadata);
 
             if (metadata.url) {
                 const target = "https://savetik.co/?video=" + encodeURIComponent(metadata.url);
@@ -118,20 +119,9 @@
     }
 
     // Observer
-    function handleMutations() {
-        const videos = document.querySelectorAll("video");
-        videos.forEach(video => {
-            processVideo(video);
-        });
-    }
-
     const observer = new MutationObserver(() => {
-        handleMutations();
+        document.querySelectorAll("video").forEach(processVideo);
     });
-
     observer.observe(document.body, { childList: true, subtree: true });
-    handleMutations();
-
-
-
+    document.querySelectorAll("video").forEach(processVideo);
 })();
