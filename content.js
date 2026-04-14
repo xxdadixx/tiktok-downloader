@@ -25,9 +25,7 @@
             username: username
         };
     }
-    /**
-     * ฟังก์ชันค้นหา URL ของวิดีโอ (ใช้ Logic เดิมที่แม่นยำแล้ว)
-     */
+
     function findVideoUrl(videoElement) {
         if (/\/video\/\d+/.test(window.location.href)) {
             return window.location.href;
@@ -36,10 +34,6 @@
         if (closestLink && /\/video\/\d+/.test(closestLink.href)) {
             return closestLink.href;
         }
-        const canonical = document.querySelector('link[rel="canonical"]');
-        if (canonical && /\/video\/\d+/.test(canonical.href)) {
-            return canonical.href;
-        }
         return null;
     }
 
@@ -47,22 +41,28 @@
      * ฟังก์ชันสร้างปุ่ม Download
      */
     function processVideo(video) {
-        // 1. เช็ค URL: ถ้าไม่ใช่หน้า Video ให้จบการทำงาน
-        if (!window.location.href.includes("/video/")) return;
+        
+        // ✅ 1. WHITELIST: เช็คก่อนเลยว่าเป็น "หน้า Profile" หรือไม่?
+        // ถ้าเป็น Grid ในหน้า Profile (user-post-item) ให้สร้างปุ่มได้เลย ไม่ต้องสน Feed Filter
+        const isProfileGrid = video.closest('[data-e2e="user-post-item"], [data-e2e="user-post-item-list"]');
+        
+        if (!isProfileGrid) {
+            // 🛑 2. BLACKLIST (Feed Filter):
+            // ถ้าไม่ใช่หน้า Profile ให้เช็คว่าเป็นหน้า Feed (For You) หรือไม่
+            // ถ้าใช่ ให้หยุดทำงาน (ไม่สร้างปุ่ม)
+            const isFeed = video.closest('[data-e2e="recommend-list-item-container"]');
+            if (isFeed) return;
 
-        // 2. กรอง Container: ป้องกันปุ่มไปโผล่ในจุดที่ไม่ใช่
-        const isFeedOrGrid = video.closest([
-            '[data-e2e="recommend-list-item-container"]', 
-            '[data-e2e="list-item-container"]',
-            '[data-e2e="user-post-item"]',
-            '[data-e2e="user-post-item-list"]',
-            '.DivItemContainer'
-        ].join(','));
+            // 🛑 3. URL CHECK (Fallback):
+            // ถ้าไม่ใช่ Profile และ URL ก็ไม่มี /video/ (อาจจะเป็นหน้า Home แบบอื่น) ให้กันเหนียวไว้
+            if (!window.location.href.includes("/video/") && !window.location.href.includes("@")) {
+                return;
+            }
+        }
 
-        if (isFeedOrGrid) return;
-
-        // หา Container
+        // --- ส่วนหา Container และสร้างปุ่ม ---
         let container = video.parentElement;
+        
         if (container.querySelector(".tiktok-save-button")) return;
 
         if (container.tagName === 'A') {
@@ -104,42 +104,31 @@
         container.appendChild(btn);
     }
 
-    function removeAllButtons() {
-        const allButtons = document.querySelectorAll(".tiktok-save-button");
-        if (allButtons.length > 0) {
-            allButtons.forEach(btn => btn.remove());
-        }
-    }
-
-    // --- MAIN LOGIC LOOP ---
-    // ใช้ setInterval เพื่อตรวจสอบ URL ตลอดเวลา แก้ปัญหา URL เปลี่ยนช้า
+    // --- MAIN LOOP ---
     setInterval(() => {
-        // ถ้า URL มีคำว่า /video/ (แสดงว่าอยู่ในหน้าดูคลิป)
-        if (window.location.href.includes("/video/")) {
-            // สั่งสแกนหา Video เพื่อแปะปุ่ม
-            document.querySelectorAll("video").forEach(processVideo);
-        } else {
-            // ถ้า URL ไม่มี /video/ (กลับมาหน้า Feed แล้ว)
-            // สั่งลบปุ่มทิ้งทั้งหมดทันที (แก้ปุ่มค้าง)
-            removeAllButtons();
-        }
-    }, 500); // ทำงานทุกๆ 0.5 วินาที
+        document.querySelectorAll("video").forEach(processVideo);
+    }, 500);
 
     // Observer
     const observer = new MutationObserver(() => {
-        // 🔥 CLEANUP SYSTEM: กฎเหล็ก
-        // ถ้า URL ปัจจุบัน "ไม่มี" คำว่า /video/ แสดงว่าเราไม่ได้ดูคลิปอยู่ (กลับมาหน้า Feed/Profile แล้ว)
-        // ให้สั่ง "ลบปุ่มทิ้งทั้งหมด" ทันที เพื่อแก้ปัญหาปุ่มค้าง
-        if (!window.location.href.includes("/video/")) {
+        
+        // 🔥 CLEANUP SYSTEM (ฉบับแก้ไข):
+        // จะสั่งลบปุ่มทิ้ง "เฉพาะเมื่อ"
+        // 1. URL ไม่มีคำว่า /video/ (ไม่ใช่หน้าดูคลิป)
+        // 2. AND (และ) URL ไม่มีเครื่องหมาย @ (ไม่ใช่หน้า Profile)
+        // = แปลว่าเป็นหน้า Feed หรือหน้าแรกจริงๆ ถึงจะลบ
+        const isVideoPage = window.location.href.includes("/video/");
+        const isProfilePage = window.location.href.includes("@");
+
+        if (!isVideoPage && !isProfilePage) {
             const allButtons = document.querySelectorAll(".tiktok-save-button");
             if (allButtons.length > 0) {
                 allButtons.forEach(btn => btn.remove());
-                // console.log("Cleanup buttons on feed/profile");
             }
-            return; // จบการทำงาน ไม่ไปสร้างปุ่มเพิ่ม
+            return; 
         }
 
-        // ถ้า URL ถูกต้อง ก็ทำงานปกติ
+        // ถ้าเงื่อนไขถูกต้อง (เป็นหน้าดูคลิป หรือ หน้า Profile) ให้ทำงานต่อ
         document.querySelectorAll("video").forEach(processVideo);
     });
 
